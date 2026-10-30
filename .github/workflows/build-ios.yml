@@ -12,7 +12,7 @@ jobs:
       - name: Checkout KOReader iOS
         uses: actions/checkout@v4
         with:
-          repository: hezi/koreader-ios
+          repository: fennis901/koreader-ios
           submodules: recursive
           fetch-depth: 1
 
