@@ -81,17 +81,18 @@ jobs:
           xcodebuild \
             -project KOReader.xcodeproj \
             -scheme KOReader \
-            -configuration Debug \
+            -configuration Release \
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            ENABLE_DEBUG_DYLIB=NO \
             build 2>&1 | tee xcodebuild.log
 
       - name: Find KOReader.app
         run: |
           APP=$(find "$HOME/Library/Developer/Xcode/DerivedData" \
             -type d \
-            -path "*/Build/Products/Debug-iphoneos/KOReader.app" \
+            -path "*/Build/Products/Release-iphoneos/KOReader.app" \
             -print -quit)
 
           if [ -z "$APP" ]; then
@@ -102,6 +103,18 @@ jobs:
           echo "Found:"
           echo "$APP"
 
+          # Ad-hoc sign every Mach-O so the IPA launches on a device after
+          # TrollStore / AltStore re-signing. Xcode builds with
+          # CODE_SIGNING_ALLOWED=NO and the upstream post-build script only
+          # signs app/ Mach-O, so the main executable ships unsigned and dyld
+          # kills the app at launch. (Release also removes the Debug-config
+          # debug-dylib stub that was loaded unsigned.)
+          find "$APP" -type f \( -name '*.dylib' -o -name '*.so' -o -name 'KOReader' \) -print0 \
+            | while IFS= read -r -d '' macho; do
+                codesign --force --sign - --timestamp=none "$macho" >/dev/null
+              done
+          codesign --force --sign - --timestamp=none "$APP" >/dev/null
+          echo "Ad-hoc signed bundle."
           echo "$APP" > koreader_app_path.txt
 
       - name: Package IPA
